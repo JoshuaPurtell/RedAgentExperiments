@@ -3,7 +3,9 @@ import numpy as np
 
 from src.red_types import Reward, History, VisualHistoryKNN
 from src.game import GameHandler
+import random
 
+import time
 class RewardHandler:
 
     #story / strategy
@@ -57,7 +59,7 @@ class RewardHandler:
         seen_coords_relative_len = len(history.seen_coords[coord_string]) / np.median([len(v) for v in history.seen_coords.values()])
 
         novelty, visual_history_knn = self.get_visual_novelty_reward(state, visual_history_knn)
-        exploration_param_vec = [.5,.5]
+        exploration_param_vec = [-.5,.5]
         reward_vec = [seen_coords_relative_len, novelty]
         return np.dot(exploration_param_vec, reward_vec), visual_history_knn
     
@@ -95,6 +97,8 @@ class RewardHandler:
         reward.experience_reward = experience_reward
         reward.exploration_reward = exploration_reward
         reward.tactics_reward = tactics_reward
+        if random.random() < .01:
+            print(f"story_reward: {story_reward}, experience_reward: {experience_reward}, exploration_reward: {exploration_reward}, tactics_reward: {tactics_reward}")
 
         reward.channel_vec = channel_vec
         reward.total_reward = total_reward

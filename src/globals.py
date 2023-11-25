@@ -1,6 +1,6 @@
 from pyboy.utils import WindowEvent
 
-ep_length = 2048#2048 * 10
+ep_length = 2048 * 10#204
 batch_size = 64
 n_epochs = 3
 

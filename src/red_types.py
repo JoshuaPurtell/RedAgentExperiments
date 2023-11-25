@@ -1,9 +1,10 @@
 from typing import List, Any
+from matplotlib.transforms import BlendedGenericTransform
 import numpy as np
 from pathlib import Path
 import mediapy as media
 import hnswlib
-
+import time
 from src.globals import output_full
 
 class PlayerState:
@@ -48,6 +49,35 @@ class History:
     recent_actions: list
     seen_coords: dict
 
+class VideoHandlerNew:
+    def __init__(self, save_path, reset_count, instance_id):
+        self.base_directory = Path(save_path) / 'rollouts'
+        self.base_directory.mkdir(exist_ok=True)
+        self.full_video_name = self.base_directory / f'full_reset_{reset_count}_id{instance_id}.mp4'
+        self.model_video_name = self.base_directory / f'model_reset_{reset_count}_id{instance_id}.mp4'
+
+        self.full_frame_writer = None
+        self.model_frame_writer = None
+
+    def open(self):
+        # Open video writers
+        self.full_frame_writer = media.VideoWriter(str(self.full_video_name), (128, 40), fps=60)
+        self.model_frame_writer = media.VideoWriter(str(self.model_video_name), (128, 40), fps=60)
+
+    def close(self):
+        # Close video writers
+        if self.full_frame_writer:
+            self.full_frame_writer.close()
+        if self.model_frame_writer:
+            self.model_frame_writer.close()
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
 
 class VideoHandler:
     base_directory: str
@@ -73,31 +103,29 @@ class VisualHistoryKNN:
         self.similar_frame_distance = similar_frame_distance
         self.knn_index = hnswlib.Index(space='l2', dim=self.vector_dimension)
         self.knn_index.init_index(max_elements=self.number_of_elements, ef_construction=100, M=16)
+        self.cached_distances = {}
 
-    def _get_minimum_pairwise_distance(self, selected_elements: List[np.ndarray]):
-        if len(selected_elements) < 2:
-            return [0]
-        minimum_distances = []
+    def _add_distances_to_cache(self, selected_elements: List[np.ndarray]):
         for i in range(len(selected_elements)):
-            minimum_distance = float('inf')
             for j in range(len(selected_elements)):
                 if i != j:
-                    distance = np.linalg.norm(selected_elements[i]-selected_elements[j]) 
-                    #distance = np.dot(selected_elements[i],selected_elements[j])/(np.linalg.norm(selected_elements[i])*(np.linalg.norm(selected_elements[j])))#self.knn_index.knn_query(selected_elements[i], k=1)[1][0][0] - self.knn_index.knn_query(selected_elements[j], k=1)[1][0][0]
-                    minimum_distance = min(minimum_distance, abs(distance))
-            minimum_distances.append(minimum_distance)
-        return list(set(minimum_distances))
+                    pair = tuple(sorted([i, j]))
+                    if pair not in self.cached_distances:
+                        distance = np.linalg.norm(selected_elements[i]-selected_elements[j]) 
+                        self.cached_distances[pair] = abs(distance)
 
-    def get_min_distance_distribution(self, knn_index, number_of_samples = 30):
-        indices = np.arange(knn_index.get_current_count())
-        all_vectors = np.array(knn_index.get_items(indices))
-        if len(all_vectors) < number_of_samples:
-            random_indices = np.arange(len(all_vectors))
-        else:
-            random_indices = np.random.choice(len(all_vectors), size = min(number_of_samples, len(all_vectors)), replace=False)
-        selected_vectors = all_vectors[random_indices]
-        minimum_distances = self._get_minimum_pairwise_distance(selected_vectors)
-        return minimum_distances
+    def get_min_distance_distribution(self, knn_index, number_of_samples = 300):
+        if np.random.rand() < 0.05 or len(self.cached_distances) < 300:
+            indices = np.arange(knn_index.get_current_count())
+            all_vectors = np.array(knn_index.get_items(indices))
+            if len(all_vectors) < number_of_samples:
+                random_indices = np.arange(len(all_vectors))
+            else:
+                random_indices = np.random.choice(len(all_vectors), size = min(number_of_samples, len(all_vectors)), replace=False)
+            selected_vectors = all_vectors[random_indices]
+            self._add_distances_to_cache(selected_vectors)
+        minimum_distances = list(self.cached_distances.values())
+        return minimum_distances if len(minimum_distances) > 0 else [0]
     
     def update_frame_knn_index(self, flate_state, lmbda = 2):
         if self.knn_index.get_current_count() == 0:

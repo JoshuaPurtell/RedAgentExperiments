@@ -24,12 +24,11 @@ class TensorboardCallback(BaseCallback):
     def __init__(self, verbose=0):
         super().__init__(verbose)
 
-    def _on_step(self) -> bool:
+    def _on_step_new(self) -> bool:
         if self.training_env.env_method("check_if_done", indices=[0])[0]:
-            all_infos = self.training_env.get_attr("self.gamehandler.history.agent_states")
-            final_info = all_infos[-1]
-            #all_final_infos = [stats[-1] for stats in all_infos]
-            print("final_info", final_info)
+            gamehandler = self.training_env.get_attr("gamehandler")
+            agent_states = gamehandler.history.agent_states
+            final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in dir(agent_states[-1]) if not attribute.startswith('_')}
             mean_infos = merge_dicts_by_mean(final_info)
             for key,val in mean_infos.items():
                 self.logger.record(f"env_stats/{key}", val)
@@ -41,8 +40,8 @@ class TensorboardCallback(BaseCallback):
         return True
     
 
-    def _on_step_old(self) -> bool:
-        
+    def _on_step(self) -> bool:
+        save_video = self.training_env.get_attr("save_video")[0]
         if self.training_env.env_method("check_if_done", indices=[0])[0]:
             all_infos = self.training_env.get_attr("agent_stats")
             all_final_infos = [stats[-1] for stats in all_infos]
