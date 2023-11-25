@@ -11,7 +11,7 @@ from einops import rearrange
 import matplotlib.pyplot as plt
 from skimage.transform import resize
 
-import hnswlib
+
 import mediapy as media
 import pandas as pd
 
@@ -24,9 +24,9 @@ from typing import Any, List
 from src.device import DeviceHandler
 from src.game import GameHandler
 from src.reward import RewardHandler
-from src.red_types import Reward, VideoHandler
+from src.red_types import Reward, VideoHandler, VisualHistoryKNN
 
-from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons
+from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons, vec_dim
 
 
 #TODO - add agent_stats for tensorboard
@@ -46,6 +46,12 @@ from src.globals import col_steps, output_shape, memory_height, mem_padding, out
         }
 """
 
+#classic
+
+    
+
+
+
 class RedGymEnv(Env):
     def __init__(
         self, config=None):
@@ -64,6 +70,7 @@ class RedGymEnv(Env):
         self.early_stopping = config['early_stop']
         self.save_video = config['save_video']
         self.fast_video = config['fast_video']
+        self.vec_dim = vec_dim
         self.video_interval = 256 * self.act_freq
         self.explore_weight = 1 if 'explore_weight' not in config else config['explore_weight']
         self.use_screen_explore = True if 'use_screen_explore' not in config else config['use_screen_explore']
@@ -107,6 +114,7 @@ class RedGymEnv(Env):
             
         with open(self.init_state, "rb") as f:
             self.devicehandler.pyboy.load_state(f)
+        self.visualhistoryhandler = VisualHistoryKNN(self.vec_dim, self.num_elements, self.similar_frame_dist)
         self.gamehandler = GameHandler(self.devicehandler)
         self.rewardhandler = RewardHandler(reward_scale=self.reward_scale, explore_weight=self.explore_weight)
         return self.render_game_state(), {}#add_memory=False
@@ -189,11 +197,10 @@ class RedGymEnv(Env):
 
         frame_start = 2 * (memory_height + mem_padding)
         #just used for knn and stuff on visual exploration
-        #flat_state = state[frame_start:frame_start+output_shape[0], ...].flatten().astype(np.float32)
-        
+        flat_state = state[frame_start:frame_start+output_shape[0], ...].flatten().astype(np.float32)
 
         # update reward channel
-        curr_reward = self.rewardhandler.compute_reward(self.gamehandler.history, self.gamehandler)
+        curr_reward, self.visualhistoryhandler = self.rewardhandler.compute_reward(self.gamehandler.history, self.gamehandler,  self.visualhistoryhandler, flat_state)
         self.gamehandler.update_rewards(curr_reward)
 
         if len(self.gamehandler.history.rewards) > 1:

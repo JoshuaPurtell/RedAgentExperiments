@@ -14,6 +14,7 @@ output_full = (output_shape[0] * frame_stacks + 2 * (mem_padding + memory_height
 vec_dim = 4320
 
 #print_rewards = False
+#"sim_frame_dist": 2_000_000.0
 env_config = {
     "headless": True,
     "save_final_state": True,
@@ -26,7 +27,7 @@ env_config = {
     "fast_video": True,
     "gb_path": "storage/PokemonRed.gb",
     "debug": False,
-    "sim_frame_dist": 2_000_000.0,
+    "sim_frame_dist": 20_000.0,
     "use_screen_explore": True,
     "reward_scale": 4,
     "extra_buttons": False,

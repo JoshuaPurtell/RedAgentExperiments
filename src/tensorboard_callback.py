@@ -25,6 +25,23 @@ class TensorboardCallback(BaseCallback):
         super().__init__(verbose)
 
     def _on_step(self) -> bool:
+        if self.training_env.env_method("check_if_done", indices=[0])[0]:
+            all_infos = self.training_env.get_attr("self.gamehandler.history.agent_states")
+            final_info = all_infos[-1]
+            #all_final_infos = [stats[-1] for stats in all_infos]
+            print("final_info", final_info)
+            mean_infos = merge_dicts_by_mean(final_info)
+            for key,val in mean_infos.items():
+                self.logger.record(f"env_stats/{key}", val)
+            
+            images = self.training_env.env_method("render")
+            images_arr = np.array(images)
+            images_row = rearrange(images_arr, "b h w c -> h (b w) c")
+            self.logger.record("trajectory/image", Image(images_row, "HWC"), exclude=("stdout", "log", "json", "csv"))
+        return True
+    
+
+    def _on_step_old(self) -> bool:
         
         if self.training_env.env_method("check_if_done", indices=[0])[0]:
             all_infos = self.training_env.get_attr("agent_stats")
