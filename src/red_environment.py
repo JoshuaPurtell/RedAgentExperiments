@@ -26,31 +26,7 @@ from src.game import GameHandler
 from src.reward import RewardHandler
 from src.red_types import Reward, VideoHandler, VisualHistoryKNN
 
-from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons, vec_dim
-
-
-#TODO - add agent_stats for tensorboard
-"""
-{
-            'step': self.step_count, 'x': x_pos, 'y': y_pos, 'map': map_n,
-            'map_location': self.get_map_location(map_n),
-            'last_action': action,
-            'pcount': self.read_m(0xD163), 
-            'levels': levels, 
-            'levels_sum': sum(levels),
-            'ptypes': self.read_party(),
-            'hp': self.read_hp_fraction(),
-            expl[0]: expl[1],
-            'deaths': self.died_count, 'badge': self.get_badges(),
-            'event': self.progress_reward['event'], 'healr': self.total_healing_rew
-        }
-"""
-
-#classic
-
-    
-
-
+from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons, vec_dim, minimal_reward, agent_save_stats_fields
 
 class RedGymEnv(Env):
     def __init__(
@@ -63,7 +39,7 @@ class RedGymEnv(Env):
         self.save_final_state = config['save_final_state']
         self.print_rewards = config['print_rewards']
         self.headless = config['headless']
-        self.num_elements = 20000 # max
+        self.num_elements = 20000 
         self.init_state = config['init_state']
         self.act_freq = config['action_freq']
         self.max_steps = config['max_steps']
@@ -85,7 +61,6 @@ class RedGymEnv(Env):
         self.max_steps = config['max_steps']
         self.step_count = 0
 
-        # Env
         self.output_shape = output_shape
         self.mem_padding = mem_padding
         self.memory_height = memory_height
@@ -97,7 +72,6 @@ class RedGymEnv(Env):
         self.valid_actions = valid_actions
         self.action_space = spaces.Discrete(len(self.valid_actions))
         self.observation_space = spaces.Box(low=0, high=255, shape=self.output_full, dtype=np.uint8)
-        # Set this in SOME subclasses
         self.metadata = {"render.modes": []}
         self.reset()
 
@@ -105,17 +79,9 @@ class RedGymEnv(Env):
         self.seed = seed
         self.seen_coords = {}
 
-        #video?
         if self.save_video:
-            #if self.save_video and hasattr(self, 'video'):
-                #self.video.close()
             self.video = VideoHandler(self.s_path, self.reset_count, self.instance_id)
-            #self.video.open()
-            #with VideoHandler(self.s_path, self.reset_count, self.instance_id) as video_handler:
-                #self.video = video_handler#VideoHandler(self.s_path, self.reset_count, self.instance_id)
-            #_game_state
             self.devicehandler = DeviceHandler(self.config, valid_actions=self.valid_actions, act_freq=self.act_freq, save_video=self.save_video, fast_video=self.fast_video, headless=self.headless, render_func= self.render, videohandler=self.video)
-            #, use_screen_explore=self.use_screen_explore, similar_frame_dist=self.similar_frame_dist
         else:
             self.devicehandler = DeviceHandler(self.config, valid_actions=self.valid_actions, act_freq=self.act_freq, save_video=self.save_video, fast_video=self.fast_video, headless=self.headless, render_func= self.render)
             
@@ -124,7 +90,7 @@ class RedGymEnv(Env):
         self.visualhistoryhandler = VisualHistoryKNN(self.vec_dim, self.num_elements, self.similar_frame_dist)
         self.gamehandler = GameHandler(self.devicehandler)
         self.rewardhandler = RewardHandler(reward_scale=self.reward_scale, explore_weight=self.explore_weight)
-        return self.render(), {}#add_memory=False
+        return self.render(), {}
     
     def create_exploration_memory_tensor(self, reward: Reward):
         def make_reward_channel(r_val, h=memory_height, w=output_shape[1]):
@@ -138,7 +104,6 @@ class RedGymEnv(Env):
             last_pixel = floor(r_val - row_covered - col_covered) 
             memory[col, row] = last_pixel * (255 // col_steps)
             return memory
-        #story, experience, exploration, tactics
         full_memory = np.stack((
             make_reward_channel(reward.story_reward+reward.experience_reward),
             make_reward_channel(reward.exploration_reward),
@@ -158,7 +123,7 @@ class RedGymEnv(Env):
         if reduce_res:
             game_pixels_render = (255*resize(game_pixels_render, output_shape)).astype(np.uint8)
         if update_mem:
-            self.gamehandler.history.recent_frames[0] = game_pixels_render#[-1]
+            self.gamehandler.history.recent_frames[0] = game_pixels_render
         if add_memory:
             default = Reward()
             default.null()
@@ -202,15 +167,13 @@ class RedGymEnv(Env):
             for key, val in [(key, getattr(self.gamehandler.history.rewards[-1], key)) for key in ['story_reward', 'experience_reward', 'exploration_reward', 'tactics_reward']]:
                 prog_string += f' {key}: {val:5.2f}'
             prog_string += f' sum: {self.gamehandler.history.rewards[-1].total_reward:5.2f}'
-            #print(f'\r{prog_string}', end='', flush=True)
         
         if self.step_count % 50 == 0:
             plt.imsave(
                 self.s_path / Path(f'curframe_{self.instance_id}.jpeg'), 
-                self.render(reduce_res=False, add_memory=False, update_mem=False))#reduce_res=False
+                self.render(reduce_res=False, add_memory=False, update_mem=False))
 
         if self.print_rewards and done:
-            #print('', flush=True)
             if self.save_final_state:
                 fs_path = self.s_path / Path('final_states')
                 fs_path.mkdir(exist_ok=True)
@@ -219,13 +182,11 @@ class RedGymEnv(Env):
                     state)
                 plt.imsave(
                     fs_path / Path(f'frame_r{self.gamehandler.history.rewards[-1].total_reward:.4f}_{self.reset_count}_full.jpeg'), 
-                    self.render(reduce_res=False, add_memory=False, update_mem=False))#reduce_res=False
+                    self.render(reduce_res=False, add_memory=False, update_mem=False))
 
         if self.save_video and done:
             self.devicehandler.videohandler.full_frame_writer.close()
             self.devicehandler.videohandler.model_frame_writer.close()
-            #self.full_frame_writer.close()
-            #self.model_frame_writer.close()
 
         if done:
             self.all_runs.append(("\n").join([f'{key}: {val}' for key, val in self.gamehandler.history.rewards[-1].__dict__.items() if key in ['story_reward', 'experience_reward', 'exploration_reward', 'tactics_reward']]))
@@ -238,14 +199,13 @@ class RedGymEnv(Env):
         self.devicehandler.run_action_on_emulator(action)
         self.gamehandler.update_agent_states(action)
         self.gamehandler.update_seen_coords(self.step_count)
+        self.gamehandler.update_texts(self.step_count)
         self.gamehandler.history.recent_frames = np.roll(self.gamehandler.history.recent_frames, -1, axis=0)
-        state = self.render()#_game_state
+        state = self.render()
 
         frame_start = 2 * (memory_height + mem_padding)
-        #just used for knn and stuff on visual exploration
         flat_state = state[frame_start:frame_start+output_shape[0], ...].flatten().astype(np.float32)
 
-        # update reward channel
         curr_reward, self.visualhistoryhandler = self.rewardhandler.compute_reward(self.gamehandler.history, self.gamehandler,  self.visualhistoryhandler, flat_state)
         self.gamehandler.update_rewards(curr_reward)
 
@@ -253,8 +213,8 @@ class RedGymEnv(Env):
             total_delta = self.gamehandler.history.rewards[-1].total_reward - self.gamehandler.history.rewards[-2].total_reward
             channel_delta = [self.gamehandler.history.rewards[-1].channel_vec[i] - self.gamehandler.history.rewards[-2].channel_vec[i] for i in range(len(self.gamehandler.history.rewards[-1].channel_vec))]
         else:
-            total_delta = 0.00000000001
-            channel_delta = np.zeros(3) + 0.00000000001
+            total_delta = minimal_reward 
+            channel_delta = np.zeros(3) + minimal_reward 
 
         self.roll_over_stm(channel_delta)
 
@@ -262,9 +222,8 @@ class RedGymEnv(Env):
 
         self.step_count += 1
 
-        #update agent_stats for tensorboard and save info
         agent_states = self.gamehandler.history.agent_states
-        final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in ["money","badges","levels","hp_fracs","seen_pokemon","op_level","ptypes","map_location","map_n","x_pos","y_pos"]}#dir(agent_states[-1]) if not attribute.startswith('_'
+        final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in agent_save_stats_fields}
         self.agent_stats.append(final_info)
         self.save_and_print_info(done, state)
 

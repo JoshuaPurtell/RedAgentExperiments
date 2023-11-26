@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Tuple
 from matplotlib.transforms import BlendedGenericTransform
 import numpy as np
 from pathlib import Path
@@ -48,6 +48,8 @@ class History:
     recent_memory: list
     recent_actions: list
     seen_coords: dict
+    center_of_mass: Tuple[float, float]
+    texts_seen = List[Tuple[str, int]] #text, step
 
 class VideoHandlerNew:
     def __init__(self, save_path, reset_count, instance_id):
@@ -60,12 +62,10 @@ class VideoHandlerNew:
         self.model_frame_writer = None
 
     def open(self):
-        # Open video writers
         self.full_frame_writer = media.VideoWriter(str(self.full_video_name), (128, 40), fps=60)
         self.model_frame_writer = media.VideoWriter(str(self.model_video_name), (128, 40), fps=60)
 
     def close(self):
-        # Close video writers
         if self.full_frame_writer:
             self.full_frame_writer.close()
         if self.model_frame_writer:
@@ -147,4 +147,8 @@ class VisualHistoryKNN:
             return 1 + lmbda*reverse_quantile
         else:
             return np.log(distances[0][0] / np.median(sample)+2.8) + lmbda*reverse_quantile
+        
+
+class TextHistory:
+    pass
     

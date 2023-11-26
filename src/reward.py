@@ -34,7 +34,7 @@ class RewardHandler:
     def get_story_reward(self, history: History):
         self.badge_reward = history.agent_states[-1].badges - history.agent_states[-2].badges
         self.seen_pokemon_reward = sum(history.agent_states[-1].seen_pokemon) - sum(history.agent_states[-2].seen_pokemon)
-        story_param_vec = [.5,.5]
+        story_param_vec = [1000*.5,.5]
         reward_vec = [self.badge_reward, self.seen_pokemon_reward]
         return np.dot(story_param_vec, reward_vec)
     
@@ -56,11 +56,13 @@ class RewardHandler:
         y_pos = position["y"]
         map_n = position["map_n"]
         coord_string = f"x:{x_pos} y:{y_pos} m:{map_n}"
-        seen_coords_relative_len = len(history.seen_coords[coord_string]) / np.median([len(v) for v in history.seen_coords.values()])
+        rel_number_of_times_weve_been_here = len(history.seen_coords[coord_string]) / np.median([len(v) for v in history.seen_coords.values()])
+        number_of_spots = np.log(1+len(history.seen_coords))
+        distance_from_center = np.log(1+np.linalg.norm(np.array([x_pos, y_pos]) - history.center_of_mass))
 
         novelty, visual_history_knn = self.get_visual_novelty_reward(state, visual_history_knn)
-        exploration_param_vec = [-.5,.5]
-        reward_vec = [seen_coords_relative_len, novelty]
+        exploration_param_vec = [-.5,.5,.5,.5]
+        reward_vec = [rel_number_of_times_weve_been_here, number_of_spots, distance_from_center, novelty]
         return np.dot(exploration_param_vec, reward_vec), visual_history_knn
     
     def get_tactics_reward(self, history: History,gamehandler: GameHandler):
@@ -97,9 +99,8 @@ class RewardHandler:
         reward.experience_reward = experience_reward
         reward.exploration_reward = exploration_reward
         reward.tactics_reward = tactics_reward
-        if random.random() < .01:
+        if story_reward > 0 or experience_reward > 0:
             print(f"story_reward: {story_reward}, experience_reward: {experience_reward}, exploration_reward: {exploration_reward}, tactics_reward: {tactics_reward}")
-
         reward.channel_vec = channel_vec
         reward.total_reward = total_reward
         return reward, visual_history_knn

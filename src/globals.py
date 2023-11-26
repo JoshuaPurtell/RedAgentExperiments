@@ -1,6 +1,6 @@
 from pyboy.utils import WindowEvent
 
-ep_length = 2048 * 10#204
+ep_length = 2048* 10#204, 2048* 10
 batch_size = 64
 n_epochs = 3
 
@@ -12,6 +12,8 @@ frame_stacks = 3
 reward_range = (0, 15000)
 output_full = (output_shape[0] * frame_stacks + 2 * (mem_padding + memory_height), output_shape[1], output_shape[2])
 vec_dim = 4320
+minimal_reward = 0.00000000001
+agent_save_stats_fields = ["money","badges","levels","hp_fracs","seen_pokemon","op_level","ptypes","map_location","map_n","x_pos","y_pos"]
 
 #print_rewards = False
 #"sim_frame_dist": 2_000_000.0
@@ -27,7 +29,7 @@ env_config = {
     "fast_video": True,
     "gb_path": "storage/PokemonRed.gb",
     "debug": False,
-    "sim_frame_dist": 20_000.0,
+    "sim_frame_dist": 200_000.0,
     "use_screen_explore": True,
     "reward_scale": 4,
     "extra_buttons": False,
