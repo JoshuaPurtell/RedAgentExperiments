@@ -199,6 +199,7 @@ class RedGymEnv(Env):
         self.devicehandler.run_action_on_emulator(action)
         self.gamehandler.update_agent_states(action)
         self.gamehandler.update_seen_coords(self.step_count)
+        self.gamehandler.update_raw_texts(self.step_count)
         self.gamehandler.update_texts(self.step_count)
         self.gamehandler.history.recent_frames = np.roll(self.gamehandler.history.recent_frames, -1, axis=0)
         state = self.render()

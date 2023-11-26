@@ -5,7 +5,7 @@ import numpy as np
 
 from src.device import DeviceHandler
 from src.globals import frame_stacks, memory_height, output_shape
-from src.red_types import History, PlayerState, Reward
+from src.red_types import History, PlayerState, Reward, TextHistoryHandler
 from src.text import dump_text, get_text
 
 
@@ -15,6 +15,7 @@ class GameHandler:
         self.history.center_of_mass = (0, 0)
         self.history.rewards = []
         self.history.texts_seen = []
+        self.history.raw_texts_seen = []
         self.history.agent_states = []
         self.history.recent_frames = np.zeros(
             (frame_stacks, output_shape[0], output_shape[1], output_shape[2]), dtype=np.uint8
@@ -22,6 +23,7 @@ class GameHandler:
         self.history.recent_memory = np.zeros((output_shape[1] * memory_height, 3), dtype=np.uint8)
         self.history.recent_actions = []
         self.history.seen_coords = {}
+        self.history.text_history_handler = TextHistoryHandler()
         self.devicehandler = devicehandler
 
     def get_levels(self):
@@ -110,10 +112,19 @@ class GameHandler:
     def update_rewards(self, reward: Reward):
         self.history.rewards.append(reward)
 
-    def update_texts(self, step_count: int):
+    def update_raw_texts(self, step_count: int):
         current_text = self.screen_to_text()
-        if set(current_text).difference(set(["X"," ",""])):
-            self.history.texts_seen.append((current_text, step_count))
+        if set(current_text).difference(set(["X"," ","","\n"])):
+            current_text = re.sub('X{2,}', '', current_text)
+            current_text = re.sub('X\s{1,}X', '', current_text)
+            current_text = re.sub('\s{2,}', ' ', current_text)
+            self.history.raw_texts_seen.append((current_text, step_count))
+    
+    def update_texts(self, step_count: int):
+        penult_text_final = self.history.text_history_handler.get_final_text(self.history.raw_texts_seen[-10:])
+        if len(penult_text_final) > 0:
+            distance_from_seen_texts = self.history.text_history_handler.get_final_text_distance(penult_text_final)
+            self.history.texts_seen.append((penult_text_final, step_count-1, distance_from_seen_texts))
 
     def update_seen_coords(self, step_count: int):
         position = self.get_pos()
@@ -125,12 +136,7 @@ class GameHandler:
         def extract_coords(coord_string):
             x_part = re.search("x:(.*) y:", coord_string).group(1)
             y_part = re.search("y:(.*) m:", coord_string).group(1)
-            print
             return int(x_part), int(y_part)
-            # parts = coord_string.split()  # Splits the string by spaces
-            # x_pos = int(parts[0].split(':')[1])  # Splits the first part by ':' and converts the second element to int
-            # y_pos = int(parts[1].split(':')[1])  # Splits the second part by ':' and converts the second element to int
-            # return x_pos, y_pos
         
         if coord_string not in self.history.seen_coords:
             self.history.seen_coords[coord_string] = [step_count]
@@ -155,7 +161,8 @@ class GameHandler:
         new_state.levels = self.get_levels()
         new_state.ptypes = self.get_party_types()
         hps, max_hps = self.get_hps()
-        new_state.hp_fracs = [hps[i] / np.max([1, max_hps[i]]) for i in range(6)]
+        new_state.hps = hps#[hps[i] / np.max([1, max_hps[i]]) for i in range(6)]
+        new_state.max_hps = max_hps
         new_state.badges = self.get_badges()
         new_state.money = self.get_money()
 

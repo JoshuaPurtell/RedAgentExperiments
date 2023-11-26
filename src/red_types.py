@@ -6,6 +6,12 @@ import mediapy as media
 import hnswlib
 import time
 from src.globals import output_full
+import faiss
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+import nltk
+nltk.download('brown')
+from nltk.corpus import brown
 
 class PlayerState:
     step: int
@@ -21,7 +27,8 @@ class PlayerState:
     money: int
     badges: int
     seen_pokemon: List[int]
-    hp_fracs: List[float]
+    hps: List[int]
+    max_hps: List[int]
 
 class Reward:
     story_reward: float
@@ -49,7 +56,9 @@ class History:
     recent_actions: list
     seen_coords: dict
     center_of_mass: Tuple[float, float]
-    texts_seen = List[Tuple[str, int]] #text, step
+    raw_texts_seen: List[Tuple[str, int]] #text, step
+    texts_seen: List[Tuple[str, int, float]] #text, step, distance
+    text_history_handler: Any
 
 class VideoHandlerNew:
     def __init__(self, save_path, reset_count, instance_id):
@@ -147,8 +156,71 @@ class VisualHistoryKNN:
             return 1 + lmbda*reverse_quantile
         else:
             return np.log(distances[0][0] / np.median(sample)+2.8) + lmbda*reverse_quantile
-        
 
-class TextHistory:
-    pass
+class TextHistoryHandler:
+    #only use text if it includes prev text and is not included by following text
+    #recent
+    def __init__(self):
+        self.tvs = TextVectorStore(similarity_threshold=0.1)
     
+    def is_penult_fully_revealed(self, texts: List[Tuple[str, int]], recent = 5):
+        if len(texts) < recent:
+            return False
+        recent_texts = texts[-recent:]
+        if (recent - sum([0==len(t[0]) for t in recent_texts]))< 2:
+            return False
+        if len([1.0 == d for d in np.diff([t[1] for t in recent_texts])]) < 1: #have there been sequential text reveals?
+            return False
+        penult_and_pre_text_intersections = [list(set(t[0]).intersection(set(recent_texts[-1][0]))) for t in recent_texts[:-2]]
+        texts_included_in_penult = sum([len(intersection) / len(list(set(text[0]))) > 0.8 for intersection, text in zip(penult_and_pre_text_intersections, recent_texts[:-2])])
+        penult_inclusion_ratio = len(list(set(recent_texts[-2][0]).intersection(set(recent_texts[-1][0])))) / (len(list(set(recent_texts[-2][0])))+1)
+        penult_strictly_included_in_last = (penult_inclusion_ratio > 0.3) and (penult_inclusion_ratio < 0.85)
+        penult_strictly_equal_to_last = penult_inclusion_ratio > 0.97
+        if texts_included_in_penult > 1 and not penult_strictly_included_in_last and not penult_strictly_equal_to_last:
+            return True
+        return False
+
+    def get_final_text(self, texts: List[Tuple[str, int]]):
+        if len(texts) < 2:
+            return ""
+        if self.is_penult_fully_revealed(texts):
+            return texts[-2][0]
+        return ""
+    
+    def get_final_text_distance(self, text: str):
+        distance = self.tvs.get_distance_and_update_store(text)
+        return distance
+
+    
+class TextVectorStore:
+    def __init__(self, similarity_threshold=0.1):
+        
+        self.text_vectorizer = TfidfVectorizer()
+        self.vector_dimension = None  # Initialize without setting dimension
+        self.similarity_threshold = similarity_threshold
+        self.vector_index = None  # Initialize as None
+
+        corpus = [brown.raw(fileid) for fileid in brown.fileids()]
+        self.fit_vectorizer(corpus)
+
+    def _convert_text_to_vector(self, text):
+        return self.text_vectorizer.transform([text]).toarray()[0]
+
+    def _add_text_vector_to_store(self, text_vector):
+        text_vector = np.array([text_vector], dtype='float32')  # Ensure text_vector is 2D and of type float32
+        faiss.normalize_L2(text_vector)
+        self.vector_index.add(text_vector.reshape(1, -1))  # Reshape the text_vector to 2D before adding
+
+
+    def fit_vectorizer(self, corpus):
+        self.text_vectorizer.fit(corpus)
+        self.vector_dimension = len(self.text_vectorizer.get_feature_names_out())  # Set the correct dimension
+        self.vector_index = faiss.IndexFlatL2(self.vector_dimension)  # Reinitialize the FAISS index
+
+    def get_distance_and_update_store(self, text):
+        text_vector = self._convert_text_to_vector(text)
+        text_vector = np.array([text_vector])  # Ensure text_vector is 2D
+        distances, _ = self.vector_index.search(text_vector, 1)
+        if distances[0][0] > self.similarity_threshold:
+            self._add_text_vector_to_store(text_vector)
+        return distances[0][0]

@@ -34,7 +34,7 @@ class RewardHandler:
     def get_story_reward(self, history: History):
         self.badge_reward = history.agent_states[-1].badges - history.agent_states[-2].badges
         self.seen_pokemon_reward = sum(history.agent_states[-1].seen_pokemon) - sum(history.agent_states[-2].seen_pokemon)
-        story_param_vec = [1000*.5,.5]
+        story_param_vec = [100*.5,.5]
         reward_vec = [self.badge_reward, self.seen_pokemon_reward]
         return np.dot(story_param_vec, reward_vec)
     
@@ -50,6 +50,13 @@ class RewardHandler:
         reward = visual_history_knn.update_frame_knn_index(flat_state)
         return reward, visual_history_knn
     
+    def get_text_reward(self, history: History):
+        if len(history.texts_seen) != 0 and history.texts_seen[-1][1] == len(history.agent_states)-1:
+            return np.log(history.texts_seen[-1][2]+1)
+        else:
+            return 0
+
+    
     def get_exploration_reward(self, history: History, gamehandler: GameHandler, visual_history_knn: VisualHistoryKNN, state):
         position = gamehandler.get_pos()
         x_pos = position["x"]
@@ -61,19 +68,22 @@ class RewardHandler:
         distance_from_center = np.log(1+np.linalg.norm(np.array([x_pos, y_pos]) - history.center_of_mass))
 
         novelty, visual_history_knn = self.get_visual_novelty_reward(state, visual_history_knn)
-        exploration_param_vec = [-.5,.5,.5,.5]
+        exploration_param_vec = [-.5,.5,3,2]
         reward_vec = [rel_number_of_times_weve_been_here, number_of_spots, distance_from_center, novelty]
         return np.dot(exploration_param_vec, reward_vec), visual_history_knn
     
     def get_tactics_reward(self, history: History,gamehandler: GameHandler):
-        self.heal_reward = sum(history.agent_states[-1].hp_fracs) - sum(history.agent_states[-2].hp_fracs)
+        self.fainted_reward = sum([hp==0 for hp in history.agent_states[-1].hps]) - sum([hp==0 for hp in history.agent_states[-1].max_hps])
+        self.heal_reward = sum(history.agent_states[-1].hps) - sum(history.agent_states[-2].hps)
         self.money_reward = history.agent_states[-1].money - history.agent_states[-2].money
         died = gamehandler.get_death()
-        tactics_param_vec = [.5,.5, -1]
-        reward_vec = [self.heal_reward, self.money_reward,1 if died else 0]
+        tactics_param_vec = [.5,.5, -10, -3]
+        reward_vec = [self.heal_reward, self.money_reward,1 if died else 0, self.fainted_reward]
         return np.dot(tactics_param_vec, reward_vec)
 
     def compute_reward(self, history: History, gamehandler: GameHandler, visual_history_knn: VisualHistoryKNN, state):
+        text_weight = .05
+        channel_params = [.25,.25,self.explore_weight*.25,.25, text_weight*.25]
         if len(history.agent_states) < 2:
             reward = Reward()
             reward.story_reward = 0
@@ -81,17 +91,18 @@ class RewardHandler:
             reward.exploration_reward = 0
             reward.tactics_reward = 0
 
-            reward.channel_vec = [0,0,0,0]
+            reward.channel_vec = [0]*len(channel_params)
             reward.total_reward = 0
             return reward, visual_history_knn
     
-        channel_params = [.25,.25,self.explore_weight*.25,.25]
+        
         story_reward = self.get_story_reward(history)
         experience_reward = self.get_experience_reward(history)
         exploration_reward, visual_history_knn = self.get_exploration_reward(history,gamehandler,visual_history_knn,state)
         tactics_reward = self.get_tactics_reward(history,gamehandler)
+        text_reward = self.get_text_reward(history)
         
-        channel_vec = [story_reward, experience_reward, exploration_reward, tactics_reward]
+        channel_vec = [story_reward, experience_reward, exploration_reward, tactics_reward, text_reward]
         total_reward = self.reward_scale*np.dot(channel_params, channel_vec)
 
         reward = Reward()
@@ -100,7 +111,7 @@ class RewardHandler:
         reward.exploration_reward = exploration_reward
         reward.tactics_reward = tactics_reward
         if story_reward > 0 or experience_reward > 0:
-            print(f"story_reward: {story_reward}, experience_reward: {experience_reward}, exploration_reward: {exploration_reward}, tactics_reward: {tactics_reward}")
+            print(f"story_reward: {story_reward}, experience_reward: {experience_reward}, exploration_reward: {exploration_reward}, tactics_reward: {tactics_reward}, text_reward: {text_reward}")
         reward.channel_vec = channel_vec
         reward.total_reward = total_reward
         return reward, visual_history_knn

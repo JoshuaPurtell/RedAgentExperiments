@@ -14,7 +14,13 @@ def get_text(pyboy: PyBoy):
     screen_pixels = get_screen(pyboy)
     tiles_id_matrix, tiles_hash_matrix = get_tiles(screen_pixels)
     translation, tile_ids = get_translation(tiles_id_matrix, tiles_hash_matrix)
-    sequential_translation = "\n".join(["".join(row) for row in translation])
+    sequential_translation = "\n".join(
+        [
+            "".join(row) 
+            for row in translation 
+            if len(set(["X", " "]).intersection(set(row))) < len(row)
+        ]
+    )
     return sequential_translation
 
 def deterministic_hash(input_bytes):
@@ -109,36 +115,28 @@ def get_translation(tiles_id_matrix, tiles_hash_matrix, hash_to_english_path="ru
 
 
 def dump_text(pyboy: PyBoy, tile_hash_map_path="run/hash_to_english.json"):
-    t1 = time.time()
     screen_pixels = get_screen(pyboy)
-    t2 = time.time()
     tiles_id_matrix, tiles_hash_matrix = get_tiles(screen_pixels)
-    t3 = time.time()
     translation, tile_ids = get_translation(
         tiles_id_matrix, tiles_hash_matrix, hash_to_english_path=tile_hash_map_path
     )
-    t4 = time.time()
+
+    valid = False
     for i in range(len(translation)):
         non_X = [translation[i][j] for j in range(len(translation[i])) if translation[i][j] not in ["X", " "]]
         X = [translation[i][j] for j in range(len(translation[i])) if translation[i][j] in ["X"]]
-        
         if len(non_X) > 0 and len(X) > 0 and "POKe'DEX" not in translation[i]:
-            #print("New dump")
-            #print("Raw Translation: ", "".join(translation[i]))
-            #print("Tile ids: ", "".join(str(tile_ids[i])))
-            dump_files = os.listdir("run")
-            count_dumps = len([file for file in dump_files if "dump_" in file])
-            with open(f"run/dump_{count_dumps}.txt", "a") as f:
-                f.write("New dump\n")
-                f.write("Raw Translation: ")
-                f.write("".join(translation[i]))
-                f.write("\nTile ids: ")
-                f.write("".join(str(tile_ids[i])))
-                f.write("\n")
-                image = Image.fromarray(screen_pixels)
-                image.save(f"run/screen_pixels_{count_dumps}.png")
-    #t5 = time.time()
-    #print("Time to get screen: ", t2 - t1)
-    #print("Time to get tiles: ", t3 - t2)
-    #print("Time to get translation: ", t4 - t3)
-    #print("Time to dump: ", t5 - t4)
+            valid = True
+            break
+    if valid:
+        dump_files = os.listdir("run/text_dumps")
+        count_dumps = len([file for file in dump_files if "dump_" in file])
+        with open(f"run/text_dumps/dump_{count_dumps}.txt", "a") as f:
+            f.write("New dump\n")
+            f.write("Raw Translation: ")
+            f.write("\n".join([f"{i}: {str(translation[i])}" for i in range(len(translation))]))
+            f.write("\nTile ids: ")
+            f.write("\n".join([f"{i}: {str(tile_ids[i])}" for i in range(len(tile_ids))]))
+            f.write("\n")
+            image = Image.fromarray(screen_pixels)
+            image.save(f"run/image_dumps/screen_pixels_{count_dumps}.png")

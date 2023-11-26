@@ -13,9 +13,8 @@ reward_range = (0, 15000)
 output_full = (output_shape[0] * frame_stacks + 2 * (mem_padding + memory_height), output_shape[1], output_shape[2])
 vec_dim = 4320
 minimal_reward = 0.00000000001
-agent_save_stats_fields = ["money","badges","levels","hp_fracs","seen_pokemon","op_level","ptypes","map_location","map_n","x_pos","y_pos"]
+agent_save_stats_fields = ["money","badges","levels","hps","max_hps","seen_pokemon","op_level","ptypes","map_location","map_n","x_pos","y_pos"]
 
-#print_rewards = False
 #"sim_frame_dist": 2_000_000.0
 env_config = {
     "headless": True,
@@ -33,7 +32,7 @@ env_config = {
     "use_screen_explore": True,
     "reward_scale": 4,
     "extra_buttons": False,
-    "explore_weight": 3,  # 2.5
+    "explore_weight": 5,  # 2.5
 }
 
 valid_actions = [
