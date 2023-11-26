@@ -32,26 +32,6 @@ def get_screen(pyboy):
     screen_pixels = screen.screen_ndarray()
     return screen_pixels
 
-
-def get_tiles_old(screen_pixels):
-    tile_size = 8
-    tiles_id_matrix = []
-    tile_hash_matrix = []
-
-    for i in range(0, screen_pixels.shape[0], tile_size):
-        row_ids = []
-        row_hashes = []
-        for j in range(0, screen_pixels.shape[1], tile_size):
-            tile = screen_pixels[i : i + tile_size, j : j + tile_size]
-            tile_hash = deterministic_hash(tile.tobytes())
-            tile_id = _get_tile_id(tile)
-            row_ids.append(tile_id)
-            row_hashes.append(tile_hash)
-        tiles_id_matrix.append(row_ids)
-        tile_hash_matrix.append(row_hashes)
-
-    return tiles_id_matrix, tile_hash_matrix
-
 @lru_cache(maxsize=None)
 def cached_deterministic_hash(tile_bytes):
     return deterministic_hash(tile_bytes)
