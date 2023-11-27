@@ -6,11 +6,11 @@ import time
 from src.device import DeviceHandler
 from src.globals import frame_stacks, memory_height, output_shape
 from src.red_types import History, PlayerState, Reward, TextHistoryHandler
-from src.text import dump_text, get_text
+from src.text import get_text
 
 
 class GameHandler:
-    def __init__(self, devicehandler: DeviceHandler):
+    def __init__(self, devicehandler: DeviceHandler, tiles_cache: dict, hash_to_english: dict):
         self.history = History()
         self.history.center_of_mass = (0, 0)
         self.history.rewards = []
@@ -25,6 +25,8 @@ class GameHandler:
         self.history.seen_coords = {}
         self.history.text_history_handler = TextHistoryHandler()
         self.devicehandler = devicehandler
+        self.tiles_cache = tiles_cache
+        self.hash_to_english = hash_to_english
 
     def get_levels(self):
         return [max(self.devicehandler.read_m(a) - 2, 0) for a in [0xD18C, 0xD1B8, 0xD1E4, 0xD210, 0xD23C, 0xD268]]
@@ -99,8 +101,9 @@ class GameHandler:
             return True
 
     def screen_to_text(self, tile_size=8, mapping_dict=None):
-        dump_text(self.devicehandler.pyboy, tile_hash_map_path="run/hash_to_english.json")
-        return get_text(self.devicehandler.pyboy)
+        #dump_text(self.devicehandler.pyboy)#tile_hash_map_path="run/hash_to_english.json"
+        text, self.tiles_cache = get_text(self.devicehandler.pyboy, self.tiles_cache, self.hash_to_english)
+        return text
         # fill in later
 
     def update_recent_memory(self, new_observation: np.ndarray):

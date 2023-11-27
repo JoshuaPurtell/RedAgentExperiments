@@ -30,10 +30,14 @@ from src.globals import col_steps, output_shape, memory_height, mem_padding, out
 
 class RedGymEnv(Env):
     def __init__(
-        self, config=None,reward_hyperparameters=reward_hyperparameters):
+        self, config=None,reward_hyperparameters=reward_hyperparameters, path_to_tiles_cache="run/tiles_cache.json", path_to_hash_to_english="run/hash_to_english.json", seed=None):
 
         self.config = config
         self.reward_hyperparameters = reward_hyperparameters
+        with open(path_to_tiles_cache, "r") as f:
+            self.tiles_cache = json.load(f)
+        with open(path_to_hash_to_english, "r") as f:
+            self.hash_to_english = json.load(f)
 
         self.debug = config['debug']
         self.s_path = config['session_path']
@@ -89,7 +93,7 @@ class RedGymEnv(Env):
         with open(self.init_state, "rb") as f:
             self.devicehandler.pyboy.load_state(f)
         self.visualhistoryhandler = VisualHistoryKNN(self.vec_dim, self.num_elements, self.similar_frame_dist)
-        self.gamehandler = GameHandler(self.devicehandler)
+        self.gamehandler = GameHandler(self.devicehandler, self.tiles_cache, self.hash_to_english)
         self.rewardhandler = RewardHandler(reward_scale=self.reward_scale, explore_weight=self.explore_weight, reward_hyperparameters=self.reward_hyperparameters )
         return self.render(), {}
     
@@ -230,3 +234,6 @@ class RedGymEnv(Env):
         self.agent_stats.append(final_info)
         self.save_and_print_info(done, state)
         return state, total_delta, False, done, {}
+
+    def get_info(self):
+        return self.agent_stats[-1]
