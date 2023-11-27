@@ -1,5 +1,5 @@
 # RedAgentExperiments
-My work in parallel with PokemonRedExperiments
+My work in parallel with PokemonRedExperiments. The focus of this repo is to develop a language agent that perform well in difficult long-term tasks.
 
 # Running the Repo
 
@@ -15,4 +15,7 @@ pyenv activate red_env
 ## Install Dependencies
 pip install poetry
 poetry install
+
+## Run the Code
+python3 run/run_parallel_fast.py
 
