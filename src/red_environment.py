@@ -5,7 +5,7 @@ import os
 from math import floor, sqrt
 import json
 from pathlib import Path
-
+import time
 import numpy as np
 from einops import rearrange
 import matplotlib.pyplot as plt
@@ -26,13 +26,14 @@ from src.game import GameHandler
 from src.reward import RewardHandler
 from src.red_types import Reward, VideoHandler, VisualHistoryKNN
 
-from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons, vec_dim, minimal_reward, agent_save_stats_fields
+from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons, vec_dim, minimal_reward, agent_save_stats_fields, reward_hyperparameters
 
 class RedGymEnv(Env):
     def __init__(
-        self, config=None):
+        self, config=None,reward_hyperparameters=reward_hyperparameters):
 
         self.config = config
+        self.reward_hyperparameters = reward_hyperparameters
 
         self.debug = config['debug']
         self.s_path = config['session_path']
@@ -89,7 +90,7 @@ class RedGymEnv(Env):
             self.devicehandler.pyboy.load_state(f)
         self.visualhistoryhandler = VisualHistoryKNN(self.vec_dim, self.num_elements, self.similar_frame_dist)
         self.gamehandler = GameHandler(self.devicehandler)
-        self.rewardhandler = RewardHandler(reward_scale=self.reward_scale, explore_weight=self.explore_weight)
+        self.rewardhandler = RewardHandler(reward_scale=self.reward_scale, explore_weight=self.explore_weight, reward_hyperparameters=self.reward_hyperparameters )
         return self.render(), {}
     
     def create_exploration_memory_tensor(self, reward: Reward):
@@ -196,6 +197,7 @@ class RedGymEnv(Env):
                 self.s_path / Path(f'agent_stats_{self.instance_id}.csv.gz'), compression='gzip', mode='a')
 
     def step(self, action):
+        t = time.time()
         self.devicehandler.run_action_on_emulator(action)
         self.gamehandler.update_agent_states(action)
         self.gamehandler.update_seen_coords(self.step_count)
@@ -227,5 +229,4 @@ class RedGymEnv(Env):
         final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in agent_save_stats_fields}
         self.agent_stats.append(final_info)
         self.save_and_print_info(done, state)
-
         return state, total_delta, False, done, {}

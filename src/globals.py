@@ -35,6 +35,26 @@ env_config = {
     "explore_weight": 5,  # 2.5
 }
 
+reward_hyperparameters = {
+    "badge_reward": 100.0,
+    "seen_pokemon_reward": 1.0,
+    "op_level_reward": 1.0,
+    "p_types_reward": 1.0,
+    "rel_number_of_times_weve_been_here": 1.0,
+    "number_of_spots": 1.0,
+    "distance_from_center": 1.0,
+    "novelty": 1.0,
+    "heal_reward": 1.0,
+    "money_reward": 1.0,
+    "died_reward": 1.0,
+    "fainted_reward": 1.0,
+    "story_weight": 0.25,
+    "experience_weight": 0.25,
+    "exploration_weight": 0.25,
+    "tactics_weight": 0.25,
+    "text_weight": 0.05
+}
+
 valid_actions = [
     WindowEvent.PRESS_ARROW_DOWN,
     WindowEvent.PRESS_ARROW_LEFT,

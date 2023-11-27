@@ -2,7 +2,7 @@ import re
 from typing import List
 
 import numpy as np
-
+import time
 from src.device import DeviceHandler
 from src.globals import frame_stacks, memory_height, output_shape
 from src.red_types import History, PlayerState, Reward, TextHistoryHandler

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any, Tuple, Dict
 import numpy as np
 
 from src.red_types import Reward, History, VisualHistoryKNN
@@ -26,26 +26,28 @@ class RewardHandler:
     reward_scale: float
     explore_weight: float
 
-    def __init__(self,reward_scale=1,explore_weight=1):
+    hyperparameters: Dict[str, Any]
+
+    def __init__(self,reward_scale=1,explore_weight=1, reward_hyperparameters: Dict[str, Any] = {}):
         self.reward_scale = reward_scale
         self.explore_weight = explore_weight
+        self.hyperparameters = reward_hyperparameters
 
 
     def get_story_reward(self, history: History):
         self.badge_reward = history.agent_states[-1].badges - history.agent_states[-2].badges
         self.seen_pokemon_reward = sum(history.agent_states[-1].seen_pokemon) - sum(history.agent_states[-2].seen_pokemon)
-        story_param_vec = [100*.5,.5]
+        story_param_vec = [self.hyperparameters["badge_reward"], self.hyperparameters["seen_pokemon_reward"]]
         reward_vec = [self.badge_reward, self.seen_pokemon_reward]
         return np.dot(story_param_vec, reward_vec)
     
     def get_experience_reward(self, history: History):
         self.op_level_reward = history.agent_states[-1].op_level - np.max([history.agent_states[i].op_level for i in range(0,len(history.agent_states)-1)])
         self.p_types_reward = len(set(history.agent_states[-1].ptypes)) - len(set(history.agent_states[-2].ptypes))#?
-        exp_param_vec = [.5,.5]
+        exp_param_vec = [self.hyperparameters["op_level_reward"], self.hyperparameters["p_types_reward"]]
         reward_vec = [self.op_level_reward, self.p_types_reward]
         return np.dot(exp_param_vec, reward_vec)
     
-
     def get_visual_novelty_reward(self, flat_state, visual_history_knn: VisualHistoryKNN):
         reward = visual_history_knn.update_frame_knn_index(flat_state)
         return reward, visual_history_knn
@@ -68,7 +70,8 @@ class RewardHandler:
         distance_from_center = np.log(1+np.linalg.norm(np.array([x_pos, y_pos]) - history.center_of_mass))
 
         novelty, visual_history_knn = self.get_visual_novelty_reward(state, visual_history_knn)
-        exploration_param_vec = [-.5,.5,3,2]
+        #exploration_param_vec = [-.5,.5,3,2]
+        exploration_param_vec = [self.hyperparameters["rel_number_of_times_weve_been_here"], self.hyperparameters["number_of_spots"], self.hyperparameters["distance_from_center"], self.hyperparameters["novelty"]]
         reward_vec = [rel_number_of_times_weve_been_here, number_of_spots, distance_from_center, novelty]
         return np.dot(exploration_param_vec, reward_vec), visual_history_knn
     
@@ -77,13 +80,15 @@ class RewardHandler:
         self.heal_reward = sum(history.agent_states[-1].hps) - sum(history.agent_states[-2].hps)
         self.money_reward = history.agent_states[-1].money - history.agent_states[-2].money
         died = gamehandler.get_death()
-        tactics_param_vec = [.5,.5, -10, -3]
+        #tactics_param_vec = [.5,.5, -10, -3]
+        tactics_param_vec = [self.hyperparameters["heal_reward"], self.hyperparameters["money_reward"], self.hyperparameters["died_reward"], self.hyperparameters["fainted_reward"]]
         reward_vec = [self.heal_reward, self.money_reward,1 if died else 0, self.fainted_reward]
         return np.dot(tactics_param_vec, reward_vec)
 
     def compute_reward(self, history: History, gamehandler: GameHandler, visual_history_knn: VisualHistoryKNN, state):
-        text_weight = .05
-        channel_params = [.25,.25,self.explore_weight*.25,.25, text_weight*.25]
+        #text_weight = .05
+        #channel_params = [.25,.25,self.explore_weight*.25,.25, text_weight*.25]
+        channel_params = [self.hyperparameters["story_weight"], self.hyperparameters["experience_weight"], self.explore_weight*self.hyperparameters["exploration_weight"], self.hyperparameters["tactics_weight"], self.hyperparameters["text_weight"]]
         if len(history.agent_states) < 2:
             reward = Reward()
             reward.story_reward = 0
