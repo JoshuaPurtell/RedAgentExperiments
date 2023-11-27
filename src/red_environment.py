@@ -26,7 +26,8 @@ from src.game import GameHandler
 from src.reward import RewardHandler
 from src.red_types import Reward, VideoHandler, VisualHistoryKNN
 
-from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons, vec_dim, minimal_reward, agent_save_stats_fields, reward_hyperparameters
+from src.globals import col_steps, output_shape, memory_height, mem_padding, output_full, valid_actions, extra_buttons, vec_dim, minimal_reward, agent_save_stats_fields, reward_hyperparameters, save_freq
+
 
 class RedGymEnv(Env):
     def __init__(
@@ -173,7 +174,7 @@ class RedGymEnv(Env):
                 prog_string += f' {key}: {val:5.2f}'
             prog_string += f' sum: {self.gamehandler.history.rewards[-1].total_reward:5.2f}'
         
-        if self.step_count % 50 == 0:
+        if self.step_count % save_freq == 0:
             plt.imsave(
                 self.s_path / Path(f'curframe_{self.instance_id}.jpeg'), 
                 self.render(reduce_res=False, add_memory=False, update_mem=False))
@@ -201,30 +202,38 @@ class RedGymEnv(Env):
                 self.s_path / Path(f'agent_stats_{self.instance_id}.csv.gz'), compression='gzip', mode='a')
 
     def step(self, action):
-        t = time.time()
+        #t1 = time.time()
         self.devicehandler.run_action_on_emulator(action)
+        #t2 = time.time()
         self.gamehandler.update_agent_states(action)
+        #t3 = time.time()
         self.gamehandler.update_seen_coords(self.step_count)
+        #t4 = time.time()
         self.gamehandler.update_raw_texts(self.step_count)
+        #t5 = time.time()
         self.gamehandler.update_texts(self.step_count)
+        #t6 = time.time()
         self.gamehandler.history.recent_frames = np.roll(self.gamehandler.history.recent_frames, -1, axis=0)
+        #t7 = time.time()
         state = self.render()
+        #t8 = time.time()
 
         frame_start = 2 * (memory_height + mem_padding)
         flat_state = state[frame_start:frame_start+output_shape[0], ...].flatten().astype(np.float32)
 
         curr_reward, self.visualhistoryhandler = self.rewardhandler.compute_reward(self.gamehandler.history, self.gamehandler,  self.visualhistoryhandler, flat_state)
+        #t9 = time.time()
         self.gamehandler.update_rewards(curr_reward)
-
+        #t10 = time.time()
         if len(self.gamehandler.history.rewards) > 1:
             total_delta = self.gamehandler.history.rewards[-1].total_reward - self.gamehandler.history.rewards[-2].total_reward
             channel_delta = [self.gamehandler.history.rewards[-1].channel_vec[i] - self.gamehandler.history.rewards[-2].channel_vec[i] for i in range(len(self.gamehandler.history.rewards[-1].channel_vec))]
         else:
             total_delta = minimal_reward 
             channel_delta = np.zeros(3) + minimal_reward 
-
+        #t11 = time.time()
         self.roll_over_stm(channel_delta)
-
+        #t12 = time.time()
         done = self.check_if_done()
 
         self.step_count += 1
@@ -232,7 +241,13 @@ class RedGymEnv(Env):
         agent_states = self.gamehandler.history.agent_states
         final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in agent_save_stats_fields}
         self.agent_stats.append(final_info)
+        #t13 = time.time()
         self.save_and_print_info(done, state)
+        #t14 = time.time()
+        #total_time = t14 - t1
+        #fractions = [(t2-t1)/total_time, (t3-t2)/total_time, (t4-t3)/total_time, (t5-t4)/total_time, (t6-t5)/total_time, (t7-t6)/total_time, (t8-t7)/total_time, (t9-t8)/total_time, (t10-t9)/total_time, (t11-t10)/total_time, (t12-t11)/total_time, (t13-t12)/total_time, (t14-t13)/total_time]
+        #t2-t1 and t14-t13 are the only ones that matter
+        #print(f"Fraction of total time taken for each step: {fractions}")
         return state, total_delta, False, done, {}
 
     def get_info(self):

@@ -127,6 +127,8 @@ class GameHandler:
         penult_text_final = self.history.text_history_handler.get_final_text(self.history.raw_texts_seen[-10:])
         if len(penult_text_final) > 0:
             distance_from_seen_texts = self.history.text_history_handler.get_final_text_distance(penult_text_final)
+            if distance_from_seen_texts == np.inf:
+                distance_from_seen_texts = 100
             self.history.texts_seen.append((penult_text_final, step_count-1, distance_from_seen_texts))
 
     def update_seen_coords(self, step_count: int):

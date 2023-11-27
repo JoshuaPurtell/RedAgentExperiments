@@ -10,7 +10,7 @@ import faiss
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 import nltk
-nltk.download('brown')
+#nltk.download('brown')
 from nltk.corpus import brown
 
 class PlayerState:

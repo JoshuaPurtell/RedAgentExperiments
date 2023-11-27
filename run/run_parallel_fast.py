@@ -13,17 +13,10 @@ from src.tensorboard_callback import TensorboardCallback
 from src.globals import env_config, ep_length, batch_size, n_epochs
 from src.red_environment import RedGymEnv
 
-def make_env(rank, env_conf, seed=0):
-    """
-    Utility function for multiprocessed env.
-    :param env_id: (str) the environment ID
-    :param num_env: (int) the number of environments you wish to have in subprocesses
-    :param seed: (int) the initial seed for RNG
-    :param rank: (int) index of the subprocess
-    """
+def make_env(env_conf={}, reward_hyperparams={}, seed=0):
     def _init():
-        env = RedGymEnv(env_conf)
-        env.reset(seed=(seed + rank))
+        env = RedGymEnv(config=env_conf,reward_hyperparameters=reward_hyperparams)
+        env.reset(seed=seed)
         return env
     set_random_seed(seed)
     return _init
@@ -76,6 +69,10 @@ if __name__ == '__main__':
     
     for i in range(learn_steps):
         model.learn(total_timesteps=(ep_length)*num_cpu*1000, callback=CallbackList(callbacks))
+
+    #env_infos = []
+    #for i in range(num_cpu):
+        #env_infos.append(env.get_attr('get_info')[i])
 
     if use_wandb_logging:
         run.finish()

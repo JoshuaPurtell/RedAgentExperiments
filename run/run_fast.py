@@ -8,11 +8,11 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
 from src.tensorboard_callback import TensorboardCallback
 
-from src.globals import env_config, ep_length, batch_size, n_epochs
+from src.globals import env_config, ep_length, batch_size, n_epochs, reward_hyperparameters
 from src.red_environment import RedGymEnv
 
-def make_env(env_conf, seed=0):
-    env = RedGymEnv(env_conf)
+def make_env(env_conf, reward_hyperparams, seed=0):
+    env = RedGymEnv(config=env_conf,reward_hyperparameters=reward_hyperparams)
     env.reset(seed=seed)
     return env
 
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     sess_path = Path(f'storage/sessions/session_{sess_id}')
     env_config['session_path'] = sess_path
     
-    env = make_env(env_config)
+    env = make_env(env_config, reward_hyperparameters)
     
     checkpoint_callback = CheckpointCallback(save_freq=ep_length, save_path=sess_path,
                                      name_prefix='poke')
