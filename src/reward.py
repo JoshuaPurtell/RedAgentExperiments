@@ -133,14 +133,19 @@ class RewardHandler:
             reward.total_reward = 0
             return reward, visual_history_knn
 
+        t1 = time.time()
         story_reward = self.get_story_reward(history)
+        t2 = time.time()
         experience_reward = self.get_experience_reward(history)
+        t3 = time.time()
         exploration_reward, visual_history_knn = self.get_exploration_reward(
             history, gamehandler, visual_history_knn, state
         )
+        t4 = time.time()
         tactics_reward = self.get_tactics_reward(history, gamehandler)
+        t5 = time.time()
         text_reward = self.get_text_reward(history)
-
+        t6 = time.time()
         channel_vec = [story_reward, experience_reward, exploration_reward, tactics_reward, text_reward]
         total_reward = self.reward_scale * np.dot(channel_params, channel_vec)
 
@@ -149,10 +154,17 @@ class RewardHandler:
         reward.experience_reward = experience_reward
         reward.exploration_reward = exploration_reward
         reward.tactics_reward = tactics_reward
-        if story_reward > 0 or experience_reward > 0:
-            print(
-                f"story_reward: {story_reward * channel_params[0]}, experience_reward: {experience_reward * channel_params[1]}, exploration_reward: {exploration_reward * channel_params[2]}, tactics_reward: {tactics_reward * channel_params[3]}, text_reward: {text_reward * channel_params[4]}, total_reward: {total_reward}"
-            )
+        #if random.random()<.005:
+            #print("Total reward: ", t6-t1)
+            #print("story reward: ", t2-t1)
+            #print("experience reward: ", t3-t2)
+            #print("exploration reward: ", t4-t3)
+            #print("tactics reward: ", t5-t4)
+            #print("text reward: ", t6-t5)
+        #if story_reward > 0 or experience_reward > 0:
+            #print(
+                #f"story_reward: {story_reward * channel_params[0]}, experience_reward: {experience_reward * channel_params[1]}, exploration_reward: {exploration_reward * channel_params[2]}, tactics_reward: {tactics_reward * channel_params[3]}, text_reward: {text_reward * channel_params[4]}, total_reward: {total_reward}"
+            #)
         reward.channel_vec = channel_vec
         reward.total_reward = total_reward
         # t1 = time.time()

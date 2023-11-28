@@ -19,7 +19,7 @@ class Tuner:
         self.batch_size = batch_size
         self.n_epochs = n_epochs
         self.learn_steps = 2
-        self.num_cpu = 6
+        self.num_cpu = 8
 
     
     def execute_run(self) -> float:
@@ -49,7 +49,10 @@ class Tuner:
             model = PPO('CnnPolicy', env, verbose=2, n_steps=self.ep_length // 8, batch_size=self.batch_size, n_epochs=self.n_epochs, gamma=0.998, tensorboard_log=sess_path)
         
         for i in range(self.learn_steps):
-            model.learn(total_timesteps=(self.ep_length)*self.num_cpu*1000, callback=CallbackList(callbacks))
+            scaleup = 100
+            n_steps = (self.ep_length)*self.num_cpu*scaleup
+            print("Running for this many steps: ", (self.ep_length)*self.num_cpu*scaleup)
+            model.learn(total_timesteps=n_steps, callback=CallbackList(callbacks))
 
         env_infos = []
         for i in range(self.num_cpu):

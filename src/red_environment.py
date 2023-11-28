@@ -10,7 +10,7 @@ import numpy as np
 from einops import rearrange
 import matplotlib.pyplot as plt
 from skimage.transform import resize
-
+import random
 
 import mediapy as media
 import pandas as pd
@@ -202,38 +202,38 @@ class RedGymEnv(Env):
                 self.s_path / Path(f'agent_stats_{self.instance_id}.csv.gz'), compression='gzip', mode='a')
 
     def step(self, action):
-        #t1 = time.time()
+        t1 = time.time()
         self.devicehandler.run_action_on_emulator(action)
-        #t2 = time.time()
+        t2 = time.time()
         self.gamehandler.update_agent_states(action)
-        #t3 = time.time()
+        t3 = time.time()
         self.gamehandler.update_seen_coords(self.step_count)
-        #t4 = time.time()
+        t4 = time.time()
         self.gamehandler.update_raw_texts(self.step_count)
-        #t5 = time.time()
+        t5 = time.time()
         self.gamehandler.update_texts(self.step_count)
-        #t6 = time.time()
+        t6 = time.time()
         self.gamehandler.history.recent_frames = np.roll(self.gamehandler.history.recent_frames, -1, axis=0)
-        #t7 = time.time()
+        t7 = time.time()
         state = self.render()
-        #t8 = time.time()
+        t8 = time.time()
 
         frame_start = 2 * (memory_height + mem_padding)
         flat_state = state[frame_start:frame_start+output_shape[0], ...].flatten().astype(np.float32)
 
         curr_reward, self.visualhistoryhandler = self.rewardhandler.compute_reward(self.gamehandler.history, self.gamehandler,  self.visualhistoryhandler, flat_state)
-        #t9 = time.time()
+        t9 = time.time()
         self.gamehandler.update_rewards(curr_reward)
-        #t10 = time.time()
+        t10 = time.time()
         if len(self.gamehandler.history.rewards) > 1:
             total_delta = self.gamehandler.history.rewards[-1].total_reward - self.gamehandler.history.rewards[-2].total_reward
             channel_delta = [self.gamehandler.history.rewards[-1].channel_vec[i] - self.gamehandler.history.rewards[-2].channel_vec[i] for i in range(len(self.gamehandler.history.rewards[-1].channel_vec))]
         else:
             total_delta = minimal_reward 
             channel_delta = np.zeros(3) + minimal_reward 
-        #t11 = time.time()
+        t11 = time.time()
         self.roll_over_stm(channel_delta)
-        #t12 = time.time()
+        t12 = time.time()
         done = self.check_if_done()
 
         self.step_count += 1
@@ -241,13 +241,24 @@ class RedGymEnv(Env):
         agent_states = self.gamehandler.history.agent_states
         final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in agent_save_stats_fields}
         self.agent_stats.append(final_info)
-        #t13 = time.time()
-        self.save_and_print_info(done, state)
+        t13 = time.time()
+        #self.save_and_print_info(done, state)
         #t14 = time.time()
         #total_time = t14 - t1
         #fractions = [(t2-t1)/total_time, (t3-t2)/total_time, (t4-t3)/total_time, (t5-t4)/total_time, (t6-t5)/total_time, (t7-t6)/total_time, (t8-t7)/total_time, (t9-t8)/total_time, (t10-t9)/total_time, (t11-t10)/total_time, (t12-t11)/total_time, (t13-t12)/total_time, (t14-t13)/total_time]
         #t2-t1 and t14-t13 are the only ones that matter
         #print(f"Fraction of total time taken for each step: {fractions}")
+        #t2 = time.time()
+
+        #t9-t7
+        #if random.random() < 0.005:
+            #print("--------")
+            #print("Total time taken for step: ", t13-t1)
+            #print("Reward computation time: ", t9-t8)
+            #print("Screen rendering time: ", t8-t7)
+            #print(f"""Total time taken for step: {t13-t1}. \n Components: 
+                  #{[f"Ith component, i={i}, time taken {ti}" for i, ti in enumerate([(t2-t1), (t3-t2), (t4-t3), (t5-t4), (t6-t5), (t7-t6), (t8-t7), (t9-t8), (t10-t9), (t11-t10), (t12-t11), (t13-t12)])]
+                     #}""")
         return state, total_delta, False, done, {}
 
     def get_info(self):

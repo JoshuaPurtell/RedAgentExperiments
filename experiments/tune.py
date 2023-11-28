@@ -5,7 +5,7 @@ import json
 
 from experiments.hyperparam_tuning import Tuner
 
-ep_length = 2048 * 5  # 204, 2048* 10
+ep_length = 2048  # 204, 2048* 10
 batch_size = 32
 n_epochs = 1
 

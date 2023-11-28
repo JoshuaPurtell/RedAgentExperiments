@@ -9,6 +9,7 @@ from src.globals import output_full
 import faiss
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
+from scipy.spatial import distance
 import nltk
 #nltk.download('brown')
 from nltk.corpus import brown
@@ -113,6 +114,75 @@ class VisualHistoryKNN:
         self.knn_index = hnswlib.Index(space='l2', dim=self.vector_dimension)
         self.knn_index.init_index(max_elements=self.number_of_elements, ef_construction=100, M=16)
         self.cached_distances = {}
+        self.cached_median = None
+        self.sorted_sample_cache = None
+        self.sample_length = None
+        self.cache_refresh_rate = 0.05
+
+    def _add_distances_to_cache(self, selected_elements):
+        selected_elements = np.array(selected_elements)  # Convert to NumPy array if not already
+        dist_matrix = np.sqrt(np.sum((selected_elements[:, np.newaxis, :] - selected_elements[np.newaxis, :, :]) ** 2, axis=-1))
+        for i in range(len(selected_elements)):
+            for j in range(i + 1, len(selected_elements)):
+                self.cached_distances[(i, j)] = dist_matrix[i][j]
+
+    def get_min_distance_distribution(self, knn_index, number_of_samples=300):
+        current_count = knn_index.get_current_count()
+        if np.random.rand() < 1/np.sqrt(len(self.cached_distances)+1) or len(self.cached_distances) < 300:
+            indices = np.arange(current_count)
+            if current_count < number_of_samples:
+                random_indices = indices
+            else:
+                random_indices = np.random.choice(indices, size=number_of_samples, replace=False)
+            selected_vectors = knn_index.get_items(random_indices)
+            self._add_distances_to_cache(selected_vectors)
+        return list(self.cached_distances.values()) if self.cached_distances else [0]
+
+    def update_frame_knn_index(self, flate_state, lmbda=2):
+        current_count = self.knn_index.get_current_count()
+        if current_count == 0:
+            distances = [[0]]
+            self.knn_index.add_items(flate_state, np.array([current_count]))
+        else:
+            _, distances = self.knn_index.knn_query(flate_state, k=1)
+            if distances[0][0] > self.similar_frame_distance:
+                self.knn_index.add_items(flate_state, np.array([current_count]))
+
+        sample = self.get_min_distance_distribution(self.knn_index, number_of_samples=300)
+        if len(sample) == 0:
+            return 1
+
+        if self.sorted_sample_cache is None or np.random.rand() < self.cache_refresh_rate:
+            self.sorted_sample_cache = sorted(sample)
+            self.sample_length = len(sample)
+
+        reverse_quantile = 1 - np.searchsorted(self.sorted_sample_cache, distances[0][0]) / self.sample_length
+        if not sample or set(sample) == {0} or distances[0][0] == 0:
+            return 1 + lmbda * reverse_quantile
+        else:
+            if self.cached_median is None or np.random.rand() < self.cache_refresh_rate:
+                self.cached_median = np.median(self.sorted_sample_cache)
+                if self.cached_median == 0:
+                    self.cached_median = max(self.sorted_sample_cache, default=1)
+            self.cache_refresh_rate = 0.05 / np.sqrt(len(self.cached_distances) + 1)
+            return self.log_like(distances[0][0] - self.cached_median + 2.8) + lmbda * reverse_quantile
+
+    @staticmethod
+    def log_like(x):
+        if x > 1:
+            return np.log(x)
+        elif x < -1:
+            return -np.log(-x)
+        else:
+            return x
+class VisualHistoryKNNJosh:
+    def __init__(self, vector_dimension, number_of_elements, similar_frame_distance):
+        self.vector_dimension = vector_dimension
+        self.number_of_elements = number_of_elements
+        self.similar_frame_distance = similar_frame_distance
+        self.knn_index = hnswlib.Index(space='l2', dim=self.vector_dimension)
+        self.knn_index.init_index(max_elements=self.number_of_elements, ef_construction=100, M=16)
+        self.cached_distances = {}
 
     def _add_distances_to_cache(self, selected_elements: List[np.ndarray]):
         for i in range(len(selected_elements)):
@@ -137,25 +207,39 @@ class VisualHistoryKNN:
         return minimum_distances if len(minimum_distances) > 0 else [0]
     
     def update_frame_knn_index(self, flate_state, lmbda = 2):
+        
         if self.knn_index.get_current_count() == 0:
             distances = [[0]]
             self.knn_index.add_items(
                 flate_state, np.array([self.knn_index.get_current_count()])
             )
         else:
+            tquery = time.time()
             _, distances = self.knn_index.knn_query(flate_state, k = 1)
             if distances[0][0] > self.similar_frame_distance:
                 self.knn_index.add_items(
                     flate_state, np.array([self.knn_index.get_current_count()])
                 )
+            tqeury_end = time.time()
+            #print(f"query time: {tqeury_end-tquery}")
+        tget_min_dist = time.time()
         sample = self.get_min_distance_distribution(self.knn_index, number_of_samples = 300)
+        tget_min_dist_end = time.time()
+        ##print(f"get min dist time: {tget_min_dist_end-tget_min_dist}")
         reverse_quantile = 1 - np.searchsorted(sorted(sample), distances[0][0]) / len(sample)
         if len(sample) == 0 or list(set(sample)) == [0]:
             return 1 + lmbda*reverse_quantile
         elif distances[0][0] == 0:
             return 1 + lmbda*reverse_quantile
         else:
-            return np.log(distances[0][0] / np.median(sample)+2.8) + lmbda*reverse_quantile
+            def log_like(x):
+                if x > 1:
+                    return np.log(x)
+                elif x < -1:
+                    return -np.log(-x)
+                else:
+                    return x
+            return log_like(distances[0][0] / np.median(sample)+2.8) + lmbda*reverse_quantile
 
 class TextHistoryHandler:
     #only use text if it includes prev text and is not included by following text
