@@ -1,10 +1,10 @@
 from pyboy.utils import WindowEvent
 
-ep_length = 2048 * 10  # 204, 2048* 10
+ep_length = 20# 204, 2048* 10
 batch_size = 64
-n_epochs = 3
+n_epochs = 1
 
-save_freq = 500
+save_freq = 50
 
 col_steps = 16
 output_shape = (36, 40, 3)
@@ -38,8 +38,8 @@ env_config = {
     "action_freq": 24,
     "init_state": "storage/has_pokedex_nballs_copy.state",
     "max_steps": ep_length,
-    "print_rewards": True,
-    "save_video": True,
+    "print_rewards": False,
+    "save_video": False,
     "fast_video": True,
     "gb_path": "storage/PokemonRed.gb",
     "debug": False,

@@ -28,7 +28,8 @@ class TensorboardCallback(BaseCallback):
         if self.training_env.env_method("check_if_done", indices=[0])[0]:
             gamehandler = self.training_env.get_attr("gamehandler")
             agent_states = gamehandler.history.agent_states
-            final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in dir(agent_states[-1]) if not attribute.startswith('_')}
+            print("Dir: ",dir(agent_states[-1]))
+            final_info = {attribute: getattr(agent_states[-1], attribute) for attribute in dir(agent_states[-1]) if (not attribute.startswith('_') or attribute in ["levels","seen_pokemon"])}
             mean_infos = merge_dicts_by_mean(final_info)
             for key,val in mean_infos.items():
                 self.logger.record(f"env_stats/{key}", val)

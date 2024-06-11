@@ -10,10 +10,10 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
 from src.tensorboard_callback import TensorboardCallback
 
-from src.globals import env_config, ep_length, batch_size, n_epochs
+from src.globals import env_config, ep_length, batch_size, n_epochs, env_config,reward_hyperparameters
 from src.red_environment import RedGymEnv
 
-def make_env(env_conf={}, reward_hyperparams={}, seed=0):
+def make_env(env_conf=env_config, reward_hyperparams={}, seed=0):
     def _init():
         env = RedGymEnv(config=env_conf,reward_hyperparameters=reward_hyperparams)
         env.reset(seed=seed)
@@ -29,8 +29,8 @@ if __name__ == '__main__':
     sess_path = Path(f'storage/sessions/session_{sess_id}')
     env_config['session_path'] = sess_path
     
-    num_cpu = 16  # Also sets the number of episodes per training iteration
-    env = SubprocVecEnv([make_env(i, env_config) for i in range(num_cpu)])
+    num_cpu = 4 # Also sets the number of episodes per training iteration
+    env = SubprocVecEnv([make_env(env_conf=env_config, reward_hyperparams=reward_hyperparameters, seed=i) for i in range(num_cpu)])
     
     checkpoint_callback = CheckpointCallback(save_freq=ep_length, save_path=sess_path,
                                      name_prefix='poke')
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     # put a checkpoint here you want to start from
     file_name = 'session_e41c9eff/poke_38207488_steps' 
     
-    if exists(file_name + '.zip'):
+    if exists(file_name + '.zip') or False:
         print('\nloading checkpoint')
         model = PPO.load(file_name, env=env)
         model.n_steps = ep_length
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         model.rollout_buffer.reset()
     else:
         print('\nCreating new model')
-        model = PPO('CnnPolicy', env, verbose=2, n_steps=ep_length // 8, batch_size=batch_size, n_epochs=n_epochs, gamma=0.998, tensorboard_log=sess_path)
+        model = PPO('CnnPolicy', env, verbose=2, n_steps=ep_length // 8, batch_size=batch_size, n_epochs=n_epochs, gamma=0.9995, tensorboard_log=sess_path)
     
     for i in range(learn_steps):
         model.learn(total_timesteps=(ep_length)*num_cpu*1000, callback=CallbackList(callbacks))

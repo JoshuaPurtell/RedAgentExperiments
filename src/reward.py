@@ -39,6 +39,10 @@ class RewardHandler:
         self.seen_pokemon_reward = sum(history.agent_states[-1].seen_pokemon) - sum(
             history.agent_states[-2].seen_pokemon
         )
+        if self.badge_reward > 0:
+            print("Got a new badge!")
+        if self.seen_pokemon_reward > 0:
+            print("Saw a new pokemon!")  
         story_param_vec = [self.hyperparameters["badge_reward"], self.hyperparameters["seen_pokemon_reward"]]
         reward_vec = [self.badge_reward, self.seen_pokemon_reward]
         return np.dot(story_param_vec, reward_vec)
@@ -51,6 +55,8 @@ class RewardHandler:
             set(history.agent_states[-2].ptypes)
         )  # ?
         self.levels_reward = sum(history.agent_states[-1].levels) - sum(history.agent_states[-2].levels)
+        if self.levels_reward > 0:
+            print("level up!")
         exp_param_vec = [
             self.hyperparameters["op_level_reward"],
             self.hyperparameters["p_types_reward"],
@@ -112,9 +118,7 @@ class RewardHandler:
         return np.dot(tactics_param_vec, reward_vec)
 
     def compute_reward(self, history: History, gamehandler: GameHandler, visual_history_knn: VisualHistoryKNN, state):
-        # text_weight = .05
-        # channel_params = [.25,.25,self.explore_weight*.25,.25, text_weight*.25]
-        # t0 = time.time()
+        t0 = time.time()
         channel_params = [
             self.hyperparameters["story_weight"],
             self.hyperparameters["experience_weight"],
@@ -133,19 +137,13 @@ class RewardHandler:
             reward.total_reward = 0
             return reward, visual_history_knn
 
-        t1 = time.time()
         story_reward = self.get_story_reward(history)
-        t2 = time.time()
         experience_reward = self.get_experience_reward(history)
-        t3 = time.time()
         exploration_reward, visual_history_knn = self.get_exploration_reward(
             history, gamehandler, visual_history_knn, state
         )
-        t4 = time.time()
         tactics_reward = self.get_tactics_reward(history, gamehandler)
-        t5 = time.time()
         text_reward = self.get_text_reward(history)
-        t6 = time.time()
         channel_vec = [story_reward, experience_reward, exploration_reward, tactics_reward, text_reward]
         total_reward = self.reward_scale * np.dot(channel_params, channel_vec)
 
@@ -154,19 +152,8 @@ class RewardHandler:
         reward.experience_reward = experience_reward
         reward.exploration_reward = exploration_reward
         reward.tactics_reward = tactics_reward
-        #if random.random()<.005:
-            #print("Total reward: ", t6-t1)
-            #print("story reward: ", t2-t1)
-            #print("experience reward: ", t3-t2)
-            #print("exploration reward: ", t4-t3)
-            #print("tactics reward: ", t5-t4)
-            #print("text reward: ", t6-t5)
-        #if story_reward > 0 or experience_reward > 0:
-            #print(
-                #f"story_reward: {story_reward * channel_params[0]}, experience_reward: {experience_reward * channel_params[1]}, exploration_reward: {exploration_reward * channel_params[2]}, tactics_reward: {tactics_reward * channel_params[3]}, text_reward: {text_reward * channel_params[4]}, total_reward: {total_reward}"
-            #)
+
         reward.channel_vec = channel_vec
         reward.total_reward = total_reward
-        # t1 = time.time()
-        # print(f"reward took {t1-t0} seconds")
+        t1 = time.time()
         return reward, visual_history_knn
